@@ -1,8 +1,30 @@
 
-from .model import OpexXmlHelper, OpexMetadataContent, OpexFileContent, OpexFolderContent
-import xmltodict
+from model import OpexXmlHelper, OpexMetadataContent, OpexFileContent, OpexFolderContent
+import os
+import os.path
+import lxml.etree as etree
+
 
 class Reader:
+
+    def __init__(self, file_path, is_dir=None):
+        self.file_path = file_path
+        if is_dir is None:
+            self.is_dir = os.path.isdir(file_path)
+        # remove blank text for better writer output
+        xml_parser = etree.XMLParser(remove_blank_text=True)
+        self.tree = etree.parse(file_path, xml_parser)
+        
+    def get_contents(self):
+        metadata = OpexMetadataContent.from_xml(self.tree)
+        fs_content = None
+        if self.is_dir:
+            fs_content = OpexFolderContent.from_xml(self.tree)
+        else:
+            fs_content = OpexFileContent.from_xml(self.tree)
+            print(fs_content)
+        return metadata, fs_content
+    '''
     @staticmethod
     def read_to_dict(tree):
         return xmltodict.parse(tree)
@@ -39,8 +61,7 @@ class Reader:
             return_dict['properties'] = None
         if transfer_el is not None:
             raise NotImplementedError
-        
-        if descriptive_metadata_el is not None:
+       ''' 
             
                         
                         
