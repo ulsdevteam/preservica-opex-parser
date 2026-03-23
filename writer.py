@@ -1,6 +1,13 @@
 import model
 from model import OpexXmlHelper
 from lxml import etree
+import logging
+
+logger = logging.getLogger(__name__)
+
+def _append_skip_none(element, value):
+    if element is not None:
+        element.append(value)
 
 class Writer:
     
@@ -18,18 +25,19 @@ class Writer:
         root = builder("OPEXMetadata")
 
         transfer = builder("Transfer")
+        _append_skip_none(transfer, general_fragments.source_id)
         transfer.append(general_fragments.source_id)
         if is_dir:
-            transfer.append(fs_fragments.manifest)
+            _append_skip_none(transfer, fs_fragments.manifest)
         else:
-            transfer.append(fs_fragments.fixities)
-        transfer.append(fs_fragments.original_filename)
+            _append_skip_none(transfer, fs_fragments.fixities)
+        _append_skip_none(transfer, fs_fragments.original_filename)
         
         properties = builder("Properties")
-        properties.append(general_fragments.title)
-        properties.append(general_fragments.description)
-        properties.append(general_fragments.identifiers)
-        properties.append(general_fragments.security_descriptor)
+        _append_skip_none(properties, general_fragments.title)
+        _append_skip_none(properties, general_fragments.description)
+        _append_skip_none(properties, general_fragments.identifiers)
+        _append_skip_none(properties, general_fragments.security_descriptor)
 
 
         descriptive_metadata = general_metadata.descriptive_metadata
@@ -41,7 +49,7 @@ class Writer:
     
     def write(self, general_metadata, fs_metadata):
         root = self.generate_etree(general_metadata, fs_metadata, self.is_dir)
-        print(f"writing to {self.file_name}")
+        logger.info(f"writing to {self.file_name}")
         root.write(self.file_name, 
             encoding = "utf-8",
             xml_declaration=True,

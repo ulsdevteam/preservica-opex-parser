@@ -75,10 +75,7 @@ class OpexMetadataContent:
             source_id = source_id.text
         security_descriptor = OpexXmlHelper.find(tree, "SecurityDescriptor")
         if security_descriptor is not None:
-            if isinstance(security_descriptor, list):
-                security_descriptor = security_descriptor[0]
             security_descriptor = security_descriptor.text
-            print(security_descriptor)
         
         descriptive_metadata = OpexXmlHelper.find(tree, "DescriptiveMetadata")
         identifiers = []
