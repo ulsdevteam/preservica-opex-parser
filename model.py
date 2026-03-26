@@ -64,23 +64,23 @@ class OpexMetadataContent:
         self.descriptive_metadata.append(subtree)
     @classmethod
     def from_xml(cls, tree):
-        title = OpexXmlHelper.find(tree, "Title")
+        title = OpexXmlHelper.find(tree, "Properties/Title")
         if title is not None:
             title = title.text
-        description = OpexXmlHelper.find(tree, "Description")
+        description = OpexXmlHelper.find(tree, "Properties/Description")
         if description is not None:
             description = description.text
-        source_id = OpexXmlHelper.find(tree, "SourceID")
+        source_id = OpexXmlHelper.find(tree, "Transfer/SourceID")
         if source_id is not None:
             source_id = source_id.text
-        security_descriptor = OpexXmlHelper.find(tree, "SecurityDescriptor")
+        security_descriptor = OpexXmlHelper.find(tree, "Properties/SecurityDescriptor")
         if security_descriptor is not None:
             security_descriptor = security_descriptor.text
         
         descriptive_metadata = OpexXmlHelper.find(tree, "DescriptiveMetadata")
         identifiers = []
         identifier_types = []
-        identifiers_el = OpexXmlHelper.find(tree, "Identifiers")
+        identifiers_el = OpexXmlHelper.find(tree, "Properties/Identifiers")
         if identifiers_el is None:
             identifiers_el = []
             
@@ -127,9 +127,9 @@ class OpexFileContent:
         ret_type = namedtuple("Fragments", named_tuple_fields)
         
         ret = [None]*len(named_tuple_fields)
-
-        ret[0] = builder("OriginalFilename")
-        ret[0].text = self.original_filename
+        if self.original_filename is not None:
+            ret[0] = builder("OriginalFilename")
+            ret[0].text = self.original_filename
         
         ret[1] = builder("Fixities")
         for alg, value in zip(self.fixity_algs, self.fixity_values):
@@ -141,12 +141,10 @@ class OpexFileContent:
 
     @classmethod
     def from_xml(cls, tree):
-        filename = OpexXmlHelper.find(tree, "OriginalFilename")
-        if filename is None:
-            filename = ""
-        else:
+        filename = OpexXmlHelper.find(tree, "Transfer/OriginalFilename")
+        if filename is not None:
             filename = filename.text
-        fixities_element = OpexXmlHelper.find(tree, "Fixities")
+        fixities_element = OpexXmlHelper.find(tree, "Transfer/Fixities")
         hash_names = []
         hash_values = []
         if fixities_element is None:
@@ -218,7 +216,7 @@ class OpexFolderContent:
     def from_xml(cls, tree):
         
         # look for manifest
-        manifest_el = OpexXmlHelper.find(tree, "Manifest")
+        manifest_el = OpexXmlHelper.find(tree, "Transfer/Manifest")
         if manifest_el is None:
             return None
         
@@ -254,8 +252,13 @@ class OpexXmlHelper:
     
     @staticmethod
     def find(tree, name):
-        tag = tree.find(f".//opex:{name}", namespaces = OpexXmlHelper.ns_dict)
+        # prepend_ns
+        name = '/'.join('opex:' + x for x in name.split('/'))
+        tag = tree.find(name, namespaces = OpexXmlHelper.ns_dict)
+        if tag is None:
+            print(tag)
         return tag
+    
     
     
    

@@ -33,7 +33,21 @@ def reader_writer_roundtrip():
     print(metadata, file_content, out_path)
     writer_obj = writer.Writer(out_path, is_dir = False)
     writer_obj.write(metadata, file_content)
-      
+    
+    # compare contents
+    tree1 = etree.parse(file_path)
+    tree2 = etree.parse(out_path)
+    for node1, node2 in zip(tree1.iter(), tree2.iter()):
+        if node1.text != node2.text:
+            print(node1.tag, node2.tag)
+            print(f"text different:\n{node1.text}\n\n{node2.text}")
+        if node1.tag != node2.tag:
+            print(node1.tag, node2.tag)
+        assert node1.tag == node2.tag
+        #assert node1.text == node2.text
+        assert node1.attrib == node2.attrib
+        
+
 
 
 def test_print_checksum():

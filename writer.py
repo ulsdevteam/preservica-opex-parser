@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def _append_skip_none(element, value):
-    if element is not None:
+    if element is not None and value is not None:
         element.append(value)
 
 class Writer:
@@ -36,8 +36,8 @@ class Writer:
         properties = builder("Properties")
         _append_skip_none(properties, general_fragments.title)
         _append_skip_none(properties, general_fragments.description)
-        _append_skip_none(properties, general_fragments.identifiers)
         _append_skip_none(properties, general_fragments.security_descriptor)
+        _append_skip_none(properties, general_fragments.identifiers)
 
 
         descriptive_metadata = general_metadata.descriptive_metadata
