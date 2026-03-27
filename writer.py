@@ -17,7 +17,8 @@ class Writer:
         
     
     @staticmethod 
-    def generate_etree(general_metadata, fs_metadata, is_dir):
+    def generate_etree(general_metadata: model.OpexMetadataContent, 
+            fs_metadata: model.OpexFileContent, is_dir):
         builder = OpexXmlHelper.opex_builder
         general_fragments = general_metadata.as_xml_fragments()
         fs_fragments = fs_metadata.as_xml_fragments()

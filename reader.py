@@ -1,5 +1,6 @@
 
-from model import OpexXmlHelper, OpexMetadataContent, OpexFileContent, OpexFolderContent
+#from model import OpexXmlHelper, OpexMetadataContent, OpexFileContent, OpexFolderContent
+import model
 import os
 import os.path
 import lxml.etree as etree
@@ -7,7 +8,7 @@ import lxml.etree as etree
 
 class Reader:
 
-    def __init__(self, file_path, is_dir=None):
+    def __init__(self, file_path:str, is_dir=None):
         self.file_path = file_path
         if is_dir is None:
             self.is_dir = os.path.isdir(file_path)
@@ -15,13 +16,15 @@ class Reader:
         xml_parser = etree.XMLParser(remove_blank_text=True)
         self.tree = etree.parse(file_path, xml_parser)
         
-    def get_contents(self):
-        metadata = OpexMetadataContent.from_xml(self.tree)
+    def get_contents(self) -> tuple[
+            model.OpexMetadataContent, 
+            model.OpexFileContent | model.OpexFolderContent]:
+        metadata = model.OpexMetadataContent.from_xml(self.tree)
         fs_content = None
         if self.is_dir:
-            fs_content = OpexFolderContent.from_xml(self.tree)
+            fs_content = model.OpexFolderContent.from_xml(self.tree)
         else:
-            fs_content = OpexFileContent.from_xml(self.tree)
+            fs_content = model.OpexFileContent.from_xml(self.tree)
             print(fs_content)
         return metadata, fs_content
     '''

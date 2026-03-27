@@ -1,10 +1,30 @@
 
 from dataclasses import dataclass, fields
-from collections import namedtuple
-from typing import Optional
+from typing import Optional, Self, NamedTuple
 import lxml.etree as etree
+import os
 from lxml.builder import ElementMaker
 import hashlib
+
+class MetadataContentOpexFragments(NamedTuple):
+    title: Optional[etree._Element] 
+    description: Optional[etree._Element] # <Description> ... </Description>
+    source_id: Optional[etree._Element]
+    security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
+    identifiers: Optional[etree._Element] 
+    descriptive_metadata: Optional[etree._ElementTree]
+    pass
+
+class FileContentOpexFragments(NamedTuple):
+    original_filename: Optional[etree._Element]
+    fixities: Optional[etree._Element]
+
+class FolderContentOpexFragments(NamedTuple):
+    original_filename: Optional[etree._Element]
+    manifest: Optional[etree._Element]
+
+    
+
 @dataclass
 class OpexMetadataContent:
     # a class to represent the content within an opex file independent
@@ -17,12 +37,13 @@ class OpexMetadataContent:
     identifier_types: list[Optional[str]] = None
     descriptive_metadata: etree._ElementTree = None
     
-    def as_xml_fragments(self):
+    def as_xml_fragments(self: Self) -> MetadataContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
         named_tuple_fields = [field.name for field in fields(self)]
-        print(named_tuple_fields)
+        #print(named_tuple_fields)
         named_tuple_fields.remove("identifier_types")
-        ret_type = namedtuple("Fragments", named_tuple_fields)
+        #ret_type = namedtuple("Fragments", named_tuple_fields)
+        ret_type = MetadataContentOpexFragments
         ret = [None]*len(named_tuple_fields)
         
         for i, field in enumerate(named_tuple_fields):
@@ -113,7 +134,7 @@ class OpexFileContent:
         hash_names = []
         hash_values = []
         with open(file_path, "rb") as f:
-            file_content = f.read()
+            content = f.read()
         for alg in fixity_algs:
             assert alg in alg_dict
             digest = alg_dict[alg](content).digest
@@ -121,10 +142,11 @@ class OpexFileContent:
             hash_values.append(digest)
         return cls(filename, hash_names, hash_values)
     
-    def as_xml_fragments(self):
+    def as_xml_fragments(self) -> FileContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
         named_tuple_fields = ["original_filename", "fixities"]
-        ret_type = namedtuple("Fragments", named_tuple_fields)
+        ret_type = FileContentOpexFragments
+        #ret_type = namedtuple("Fragments", named_tuple_fields)
         
         ret = [None]*len(named_tuple_fields)
         if self.original_filename is not None:
@@ -164,9 +186,10 @@ class OpexFolderContent:
     subfile_types: list[str]
     
     # todo: check if original filename is stored with folder opex
-    def as_xml_fragments(self):
+    def as_xml_fragments(self) -> FolderContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
-        ret_type = namedtuple("Fragment", ["original_filename", "manifest"])
+        ret_type = FolderContentOpexFragments
+        #ret_type = namedtuple("Fragment", ["original_filename", "manifest"])
         ret = [None, None]
         ret[0] = builder("OriginalFilename")
         ret[0].text = self.original_filename
@@ -195,9 +218,9 @@ class OpexFolderContent:
         pass
 
     @classmethod
-    def from_fs(self, file_path, skip_patterns=None):
+    def from_fs(cls, file_path, skip_patterns=None):
         root, subdirs, subfiles = next(os.walk(file_path))
-        if skip_pattern is not None:
+        if skip_patterns is not None:
             matches_patterns = lambda x: any(ptrn in x for ptrn in skip_patterns) 
             subdirs = list(filter(lambda x: not matches_patterns(x), subdirs))
             subfiles = list(filter(lambda x: not matches_patterns(x)), subfiles)
@@ -210,7 +233,7 @@ class OpexFolderContent:
             subfile_sizes.append(size)
             subfile_types.append(filetype)
             
-        return cls(subdirs, subfiles, subfile_sizes, subfile_types)
+        return cls(file_path, subdirs, subfiles, subfile_sizes, subfile_types)
     
     @classmethod
     def from_xml(cls, tree):
@@ -220,25 +243,28 @@ class OpexFolderContent:
         if manifest_el is None:
             return None
         
+        file_path = OpexXmlHelper.find(tree, "Transfer/OriginalFilename")
+        if file_path is not None:
+            file_path = file_path.text
         # find all Manifest/Folders/Folder and store text of each folder
-        folders_el - OpexXmlHelper.find(manifest_el, "Folders")
+        folders_el = OpexXmlHelper.find(manifest_el, "Folders")
         folders_el = folders_el if folders_el is not None else []
         subfolder_names = []
         for folder_el in folders_el:
             subfolder_names.append(folder_el.text)
-        files_el - OpexXmlHelper.find(manifest_el, "Files")
+        files_el = OpexXmlHelper.find(manifest_el, "Files")
         files_el = folders_el if files_el is not None else []
 
         # Find all Manifest/Files/File and store properties
         subfile_names = []
         subfile_sizes = []
         subfile_types = []
-        for flie_el in files_el:
+        for file_el in files_el:
             subfile_names.append(file_el.text)
             subfile_sizes.append(int(file_el.get("size")))
             subfile_types.append(file_el.get("type"))
         
-        return cls(subfolder_names, subfile_names, subfile_sizes, subfile_types)
+        return cls(file_path, subfolder_names, subfile_names, subfile_sizes, subfile_types)
 
 class OpexXmlHelper:
     # utility class to generate xml fragments and 

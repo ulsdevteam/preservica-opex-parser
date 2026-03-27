@@ -20,9 +20,9 @@ def test_print_all_titles():
                 tree = etree.parse(fname)
                 #print(tree.find(".//opex:Title", 
                 #    namespaces={'opex':"http://www.openpreservationexchange.org/opex/v1.2"}))
-                start_idx, end_idx = (
-                            s.find("<opex:Title>"),
-                            s.find("</opex:Title>"))
+                #start_idx, end_idx = (
+                #            s.find("<opex:Title>"),
+                #            s.find("</opex:Title>"))
                 print(metadata.title)
 
 def reader_writer_roundtrip():
@@ -38,13 +38,14 @@ def reader_writer_roundtrip():
     tree1 = etree.parse(file_path)
     tree2 = etree.parse(out_path)
     for node1, node2 in zip(tree1.iter(), tree2.iter()):
-        if node1.text != node2.text:
+        
+        if node1.text is not None and node1.text.strip() != node2.text.strip():
             print(node1.tag, node2.tag)
             print(f"text different:\n{node1.text}\n\n{node2.text}")
         if node1.tag != node2.tag:
             print(node1.tag, node2.tag)
         assert node1.tag == node2.tag
-        #assert node1.text == node2.text
+        assert node1.text.strip() == node2.text.strip()
         assert node1.attrib == node2.attrib
         
 
