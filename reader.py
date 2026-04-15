@@ -1,6 +1,6 @@
 
 #from model import OpexXmlHelper, OpexMetadataContent, OpexFileContent, OpexFolderContent
-import model
+from . import model
 import os
 import os.path
 import lxml.etree as etree

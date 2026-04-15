@@ -1,4 +1,5 @@
 
+import copy
 from dataclasses import dataclass, fields
 from typing import Optional, Self, NamedTuple
 import lxml.etree as etree
@@ -37,6 +38,7 @@ class OpexMetadataContent:
     identifier_types: list[Optional[str]] = None
     descriptive_metadata: etree._ElementTree = None
     
+
     def as_xml_fragments(self: Self) -> MetadataContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
         named_tuple_fields = [field.name for field in fields(self)]
@@ -66,8 +68,12 @@ class OpexMetadataContent:
                     ret[i].text = field_val
                 case "identifiers":
                     ret[i] = builder("Identifiers")
+                    id_types = self.identifier_types
+                    if id_types is None:
+                        id_types = [None]*len(self.identifiers)
+                        
                     for value, id_type in zip(self.identifiers,
-                            self.identifier_types):
+                            id_types):
                         id_tag = builder("Identifier")
                         id_tag.text = value
                         if id_type is not None:
@@ -79,9 +85,12 @@ class OpexMetadataContent:
         return ret_type._make(ret)
         
     def append_descriptive_metadata(self, subtree):
+        subtree = copy.deepcopy(subtree)
         if self.descriptive_metadata is None:
             self.descriptive_metadata = (
-                OpexXmlHelper.opex_builder.tag("DescriptiveMetadata"))
+                OpexXmlHelper.opex_builder("DescriptiveMetadata"))
+        if isinstance(subtree, etree._ElementTree):
+            subtree = subtree.getroot()
         self.descriptive_metadata.append(subtree)
     @classmethod
     def from_xml(cls, tree):
@@ -137,7 +146,7 @@ class OpexFileContent:
             content = f.read()
         for alg in fixity_algs:
             assert alg in alg_dict
-            digest = alg_dict[alg](content).digest
+            digest = alg_dict[alg](content).hexdigest()
             hash_names.append(alg)
             hash_values.append(digest)
         return cls(filename, hash_names, hash_values)
@@ -191,8 +200,9 @@ class OpexFolderContent:
         ret_type = FolderContentOpexFragments
         #ret_type = namedtuple("Fragment", ["original_filename", "manifest"])
         ret = [None, None]
-        ret[0] = builder("OriginalFilename")
-        ret[0].text = self.original_filename
+        if self.original_filename is not None:
+            ret[0] = builder("OriginalFilename")
+            ret[0].text = self.original_filename
         root = builder("Manifest")
         folder_root = builder("Folders")
         for folder_name in self.subfolder_names:
@@ -207,7 +217,7 @@ class OpexFolderContent:
 
             file_tag = builder("File")
             file_tag.text = filename
-            file_tag.set("size", size)
+            file_tag.set("size", str(size))
             file_tag.set("type", ftype)
             files_root.append(file_tag)
 
@@ -228,13 +238,50 @@ class OpexFolderContent:
         subfile_sizes = []
         subfile_types = []
         for f in subfiles:
-            size = os.stat(os.path.join(root, f))
+            size = os.stat(os.path.join(root, f)).st_size
             filetype = "metadata" if f.endswith(".opex") else "content"
             subfile_sizes.append(size)
             subfile_types.append(filetype)
             
         return cls(file_path, subdirs, subfiles, subfile_sizes, subfile_types)
     
+    @classmethod
+    def from_pax_fs(cls, file_path):
+        # currently only look for representation_preservation
+        assert os.path.exists(file_path) and os.path.isdir(file_path)
+        level_1_folders = ["Representation_Preservation", 
+                           "Representation_Access"]
+        
+        root, folders, files = next(os.walk(file_path))
+        extra = [d for d in folders if d not in level_1_folders]
+        assert len(extra) == 0
+        if len(files) == 1:
+            assert files[0].endswith("xip") # only one xip file allowed
+        else:
+            assert len(files) == 0 or True
+
+        subfolder_names = []
+        subfile_names = []
+        subfile_types = []
+        subfile_sizes = []
+        for d in folders:
+            subfolder_names.append(d)
+            for subroot, _, subfiles in os.walk(os.path.join(root, d)):
+                for f in subfiles:
+                    subfile_full_path = os.path.join(subroot, f)
+                    subfile_rel_path = os.path.relpath(
+                         subfile_full_path, root
+                            )
+                    size = os.stat(subfile_full_path).st_size
+                    filetype = "metadata" if f.endswith(".opex") else "content"
+                    subfile_names.append(subfile_rel_path)
+                    subfile_types.append(filetype)
+                    subfile_sizes.append(size)
+
+        return cls(None, subfolder_names, subfile_names, 
+                   subfile_sizes, subfile_types)
+                
+            
     @classmethod
     def from_xml(cls, tree):
         

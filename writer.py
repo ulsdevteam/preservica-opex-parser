@@ -1,5 +1,5 @@
-import model
-from model import OpexXmlHelper
+from . import model
+from .model import OpexXmlHelper
 from lxml import etree
 import logging
 
@@ -27,7 +27,6 @@ class Writer:
 
         transfer = builder("Transfer")
         _append_skip_none(transfer, general_fragments.source_id)
-        transfer.append(general_fragments.source_id)
         if is_dir:
             _append_skip_none(transfer, fs_fragments.manifest)
         else:
@@ -39,13 +38,15 @@ class Writer:
         _append_skip_none(properties, general_fragments.description)
         _append_skip_none(properties, general_fragments.security_descriptor)
         _append_skip_none(properties, general_fragments.identifiers)
+        if len(properties) == 0:
+            properties = None
+        
+        if len(transfer) == 0:
+            transfer = None
 
-
-        descriptive_metadata = general_metadata.descriptive_metadata
-
-        root.append(transfer)
-        root.append(properties)
-        root.append(descriptive_metadata) 
+        _append_skip_none(root, transfer)
+        _append_skip_none(root, properties)
+        _append_skip_none(root, general_metadata.descriptive_metadata) 
         return root.getroottree()
     
     def write(self, general_metadata, fs_metadata):
