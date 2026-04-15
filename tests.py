@@ -14,7 +14,7 @@ def test_print_all_titles():
             fname = os.path.join(root, fname)
             if fname.endswith(".opex"):
                 read_obj = reader.Reader(fname)
-                metadata, _ = read_obj.get_contents()
+                metadata, fixity = read_obj.get_contents()
                 with open(fname) as f:
                     s = f.read()
                 tree = etree.parse(fname)
@@ -23,9 +23,9 @@ def test_print_all_titles():
                 #start_idx, end_idx = (
                 #            s.find("<opex:Title>"),
                 #            s.find("</opex:Title>"))
-                print(metadata.title)
+                print(metadata, fixity)
 
-def reader_writer_roundtrip():
+def test_reader_writer_roundtrip():
     file_path = "example.opex"
     out_path = "out_" + file_path
     read_obj = reader.Reader(file_path)
@@ -38,14 +38,13 @@ def reader_writer_roundtrip():
     tree1 = etree.parse(file_path)
     tree2 = etree.parse(out_path)
     for node1, node2 in zip(tree1.iter(), tree2.iter()):
-        
         if node1.text is not None and node1.text.strip() != node2.text.strip():
             print(node1.tag, node2.tag)
             print(f"text different:\n{node1.text}\n\n{node2.text}")
         if node1.tag != node2.tag:
             print(node1.tag, node2.tag)
         assert node1.tag == node2.tag
-        assert node1.text.strip() == node2.text.strip()
+        assert node1.text == node2.text or node1.text.strip() == node2.text.strip()
         assert node1.attrib == node2.attrib
         
 
@@ -68,6 +67,12 @@ def test_print_checksum():
     print(f"sha 256 checksum is {checksum}")
 
 def test():
-    reader_writer_roundtrip()
+    names = globals().keys()
+    names = filter(lambda x: x.startswith('test') and x != 'test', names)
+    names = filter(lambda x: callable, names)
+    for _test in names:
+        print(f"Test {_test}")
+        print("="*100)
+        globals()[_test]()
 if __name__ == '__main__':
     test()
