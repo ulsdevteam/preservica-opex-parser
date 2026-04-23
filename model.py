@@ -128,7 +128,8 @@ class OpexFileContent:
     original_filename: str
     fixity_algs: list[str]
     fixity_values: list[str]
-    
+    fixity_paths: Optional[list[str]] = None
+    describes_pax:bool = False
     
     @classmethod
     def from_fs(cls, file_path, fixity_algs):
@@ -151,6 +152,14 @@ class OpexFileContent:
             hash_values.append(digest)
         return cls(filename, hash_names, hash_values)
     
+    
+    @classmethod
+    def from_fs_pax(self, pax_file, pax_file_list):
+        """ Unzip pax file at `pax_file` and generate paths and
+        fixities for files within zipped pax object"""
+        assert pax_file.endswith(".pax.zip")
+        raise NotImplementedError()
+
     def as_xml_fragments(self) -> FileContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
         named_tuple_fields = ["original_filename", "fixities"]
@@ -163,10 +172,14 @@ class OpexFileContent:
             ret[0].text = self.original_filename
         
         ret[1] = builder("Fixities")
-        for alg, value in zip(self.fixity_algs, self.fixity_values):
+         
+        for i, (alg, value) in enumerate(zip(self.fixity_algs,
+                                             self.fixity_values)):
             fixity_tag = builder("Fixity")
             fixity_tag.set("type", alg)
             fixity_tag.set("value", value)
+            if self.describes_pax:
+                fixity_tag.set("path", self.fixity_paths[i])
             ret[1].append(fixity_tag)
         return ret_type._make(ret)
 
@@ -193,6 +206,7 @@ class OpexFolderContent:
     subfile_names: list[str]
     subfile_sizes: list[int]
     subfile_types: list[str]
+    describes_pax:bool = False
     
     # todo: check if original filename is stored with folder opex
     def as_xml_fragments(self) -> FolderContentOpexFragments:
@@ -246,37 +260,29 @@ class OpexFolderContent:
         return cls(file_path, subdirs, subfiles, subfile_sizes, subfile_types)
     
     @classmethod
-    def from_pax_fs(cls, file_path):
+    def from_fs_pax(cls, base_path, file_paths, folder_paths):
+        # let user tell me paths
         # currently only look for representation_preservation
-        assert os.path.exists(file_path) and os.path.isdir(file_path)
-        level_1_folders = ["Representation_Preservation", 
-                           "Representation_Access"]
-        
-        root, folders, files = next(os.walk(file_path))
-        extra = [d for d in folders if d not in level_1_folders]
-        assert len(extra) == 0
-        if len(files) == 1:
-            assert files[0].endswith("xip") # only one xip file allowed
-        else:
-            assert len(files) == 0 or True
-
         subfolder_names = []
         subfile_names = []
         subfile_types = []
         subfile_sizes = []
-        for d in folders:
-            subfolder_names.append(d)
-            for subroot, _, subfiles in os.walk(os.path.join(root, d)):
-                for f in subfiles:
-                    subfile_full_path = os.path.join(subroot, f)
-                    subfile_rel_path = os.path.relpath(
-                         subfile_full_path, root
-                            )
-                    size = os.stat(subfile_full_path).st_size
-                    filetype = "metadata" if f.endswith(".opex") else "content"
-                    subfile_names.append(subfile_rel_path)
-                    subfile_types.append(filetype)
-                    subfile_sizes.append(size)
+        assert os.path.isdir(base_path)
+        for path in folder_paths:
+            full_path = os.path.join(base_path, path)
+            assert os.path.exists(full_path)
+            subfolder_names.append(path)
+
+        for path in file_paths:
+            full_path = os.path.join(base_path, path)
+
+            assert ps.path.exists(full_path)
+            size = os.stat(full_path).st_size
+            filetype = "metadata" if path.endswith(".opex") else "content"
+            subfile_names.append(path)
+            subfile_types.append(filetype)
+            subfile_sizes.append(size)
+
 
         return cls(None, subfolder_names, subfile_names, 
                    subfile_sizes, subfile_types)

@@ -1,7 +1,4 @@
 
-from . import reader
-from . import writer
-from . import model
 from .reader import Reader
 from .writer import Writer
 from .model import OpexMetadataContent, OpexFileContent, OpexFolderContent
