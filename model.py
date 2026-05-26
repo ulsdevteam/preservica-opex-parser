@@ -24,6 +24,10 @@ class FolderContentOpexFragments(NamedTuple):
     original_filename: Optional[etree._Element]
     manifest: Optional[etree._Element]
 
+class PaxContentOpexFragments(NamedTuple):
+    original_filename: Optional[etree._Element]
+    manifest: Optional[etree._Element]
+    fixities: Optional[etree._Element]
     
 
 @dataclass
@@ -306,7 +310,7 @@ class OpexFolderContent:
         for folder_el in folders_el:
             subfolder_names.append(folder_el.text)
         files_el = OpexXmlHelper.find(manifest_el, "Files")
-        files_el = folders_el if files_el is not None else []
+        files_el = files_el if files_el is not None else []
 
         # Find all Manifest/Files/File and store properties
         subfile_names = []
@@ -319,6 +323,144 @@ class OpexFolderContent:
         
         return cls(file_path, subfolder_names, subfile_names, subfile_sizes, subfile_types)
 
+
+def get_subfiles(folder, as_relative=True):
+    basepath = folder
+
+    paths = []
+    for root, _, files in os.walk(folder):
+        for file in files:
+            fullpath = os.path.join(root, file)
+            if as_relative:
+                relpath = os.path.relpath(fullpath, basepath)
+                paths.append(relpath)
+                continue
+            paths.append(fullpath)
+
+
+@dataclass
+class OpexPaxContent:
+    # pax can have both fixities and manifest so a special case
+    # makes sense
+    original_filename: str
+    subfolder_names: list[str]
+    
+    subfile_names: list[str]
+    subfile_sizes: list[int]
+    subfile_types: list[str]
+
+    fixity_algs: list[str]
+    fixity_values: list[str]
+    fixity_paths: list[str] = None
+
+    @classmethod
+    def from_fs(cls, pax_path, algs):
+        alg_dict = {
+            "SHA-1": hashlib.sha1,
+            "SHA-256": hashlib.sha256,
+            "SHA-512": hashlib.sha512,
+            "MD5": hashlib.md5,
+        }
+        hash_names = []
+        hash_values = []
+        fixity_paths = []
+
+        for file_path in get_subfiles(pax_path, relative=False): 
+            with open(file_path, "rb") as f:
+                content = f.read()
+            for alg in algs:
+                assert alg in alg_dict
+                digest = alg_dict[alg](content).hexdigest()
+                hash_names.append(alg)
+                hash_values.append(digest)
+                fixity_paths.append(os.path.relpath(file_path, pax_path))
+
+            subfolder_names = []
+            subfile_names = []
+            subfile_types = []
+            subfile_sizes = []
+            assert os.path.isdir(pax_path)
+            for path in folder_paths:
+                full_path = os.path.join(base_path, path)
+                assert os.path.exists(full_path)
+                subfolder_names.append(path)
+
+            for path in file_paths:
+                full_path = os.path.join(base_path, path)
+
+                assert ps.path.exists(full_path)
+                size = os.stat(full_path).st_size
+                filetype = "metadata" if path.endswith(".opex") else "content"
+                subfile_names.append(path)
+                subfile_types.append(filetype)
+                subfile_sizes.append(size)
+
+
+            filename = os.path.basename(pax_path)
+            return cls(filename, subfolder_names, subfile_names, 
+                   subfile_sizes, subfile_types, hash_names,
+                       hash_values, fixity_paths)
+        pass
+
+    @classmethod
+    def from_xml(cls, tree):
+        opex_helper = OpexXmlHelper
+        filename = opex_helper.find("Transfer/OriginalFilename")
+        if filename is not None:
+            filename = filename.text
+        fixities_el = opex_helper.find("Transfer/Fixities")
+        manifest_el = opex_helper.find("Transfer/Manifest")
+        
+        ret_val = cls()
+        ret_val.original_filename = filename
+        if fixities_el is not None:
+            for fixity_el in fixities_el:
+                ret_val.fixity_algs.append(fixity_el.get("type"))
+                ret_val.fixity_values.append(fixity_el.get("value"))
+                ret_val.fixity_paths.append(fixity_el.get("path"))
+        
+        if manifest_el is not None:
+            folders_el = opex_helper.find(manifest_el, "Folders")
+            if folders_el is None:
+                folders_el = []
+            for folder in folders_el:
+                ret_val.subfolder_names.append(folder.text)
+            
+            files_el = opex_helper.find(mainfest_el, "Files")
+            if files_el is None:
+                files_el = []
+
+            for file_el in files_el:
+                ret_val.subfile_names.append(file_el.text)
+                ret_val.subfile_sizes.append(int(file_el.get("size")))
+                ret_val.subfile_types.append(file_el.get("type"))
+
+        return ret_val
+
+    def as_xml_fragments(self):
+        file_fragments = OpexFileContent(self.original_filename, 
+                                         self.fixity_algs, 
+                                         self.fixity_values
+                                         ).as_xml_fragments()
+        folder_fragments = OpexFolderContnent(self.original_filename, 
+                                              self.subfolder_names, 
+                                              self.subfile_names,
+                                              self.subfile_sizes,
+                                              self.subfile_types
+                                              ).as_xml_fragments()
+        # add in fixity paths
+        if file_fragments.fixities is not None:
+            for i, fixity_el in enumerate(file_fragments.fixities):
+                fixity_el.set("path", self.fixity_paths[i])
+
+        return PaxContentOpexFragments(self.original_filename, 
+                                       folder_fragments.manifest,
+                                       file_fragments.fixities
+                                       )
+
+        
+        
+        pass
 class OpexXmlHelper:
     # utility class to generate xml fragments and 
     # query Opex xml files
