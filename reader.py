@@ -10,10 +10,12 @@ import lxml.etree as etree
 
 class Reader:
 
-    def __init__(self, file_path:str, is_dir=None):
+    def __init__(self, file_path:str, is_dir=None, is_pax=False):
         self.file_path = file_path
         if is_dir is None:
             self.is_dir = os.path.isdir(file_path)
+
+        self.is_pax = is_pax
         # remove blank text for better writer output
         xml_parser = etree.XMLParser(remove_blank_text=True)
         self.tree = etree.parse(file_path, xml_parser)
@@ -23,7 +25,9 @@ class Reader:
             model.OpexFileContent | model.OpexFolderContent]:
         metadata = model.OpexMetadataContent.from_xml(self.tree)
         fs_content = None
-        if self.is_dir:
+        if self.is_pax:
+            fs_content = model.OpexPaxContent.from_xml(self.tree)
+        elif self.is_dir:
             fs_content = model.OpexFolderContent.from_xml(self.tree)
         else:
             fs_content = model.OpexFileContent.from_xml(self.tree)

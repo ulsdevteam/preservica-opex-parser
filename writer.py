@@ -16,9 +16,10 @@ class _StubObj:
 
 class Writer:
     
-    def __init__(self, file_path, is_dir):
+    def __init__(self, file_path, is_dir, is_pax):
         self.is_dir = is_dir
         self.file_name = file_path
+        self.is_pax = is_pax
         
     
     @staticmethod 
@@ -27,6 +28,7 @@ class Writer:
         builder = OpexXmlHelper.opex_builder
         general_fragments = _StubObj()
         fs_fragments = _StubObj()
+
         if general_metadata is not None:
             general_fragments = general_metadata.as_xml_fragments()
         if fs_metadata is not None:
@@ -36,7 +38,10 @@ class Writer:
 
         transfer = builder("Transfer")
         _append_skip_none(transfer, general_fragments.source_id)
-        if is_dir:
+        if self.is_pax:
+            _append_skip_none(transfer, fs_fragments.manifest)
+            _append_skip_none(transfer, fs_fragments.fixities)
+        elif is_dir:
             _append_skip_none(transfer, fs_fragments.manifest)
         else:
             _append_skip_none(transfer, fs_fragments.fixities)
