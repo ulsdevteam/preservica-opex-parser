@@ -24,7 +24,7 @@ class Writer:
     
     @staticmethod 
     def generate_etree(general_metadata: model.OpexMetadataContent, 
-            fs_metadata: model.OpexFileContent, is_dir):
+            fs_metadata: model.OpexFileContent, is_dir, is_pax):
         builder = OpexXmlHelper.opex_builder
         general_fragments = _StubObj()
         fs_fragments = _StubObj()
@@ -38,7 +38,7 @@ class Writer:
 
         transfer = builder("Transfer")
         _append_skip_none(transfer, general_fragments.source_id)
-        if self.is_pax:
+        if is_pax:
             _append_skip_none(transfer, fs_fragments.manifest)
             _append_skip_none(transfer, fs_fragments.fixities)
         elif is_dir:
@@ -65,7 +65,8 @@ class Writer:
         return root.getroottree()
     
     def write(self, general_metadata, fs_metadata):
-        root = self.generate_etree(general_metadata, fs_metadata, self.is_dir)
+        root = self.generate_etree(general_metadata, fs_metadata, self.is_dir,
+                                   self.is_pax)
         logger.info(f"writing to {self.file_name}")
         root.write(self.file_name, 
             encoding = "utf-8",

@@ -1,9 +1,7 @@
 
 import shutil
 import hashlib
-import model
-import writer
-import reader
+from . import model, reader, writer
 import os.path
 import os
 import lxml.etree as etree
@@ -17,13 +15,16 @@ def get_random_str(n):
     return ''.join(chars)
 
 
-def perf_test():
+def test_perf():
+    basepath = os.path.dirname(__file__)
+    test_folder_path = os.path.join(basepath, "test_folder")
     file_num = 100
     file_size = 500
-    if os.path.exists("test_folder"):
-        shutil.rmtree("test_folder")
-    os.makedirs("test_folder")
-    with open("test_folder/metadata.csv", 'w', newline='') as f:
+    
+    if os.path.exists(test_folder_path):
+        shutil.rmtree(test_folder_path)
+    os.makedirs(test_folder_path)
+    with open(os.path.join(test_folder_path, "metadata.csv"), 'w', newline='') as f:
         csv_writer = csv.DictWriter(f, fieldnames=['filename', 'title', 'description',
                                                'identifier'])
         csv_writer.writeheader()
@@ -35,14 +36,14 @@ def perf_test():
                 'description': get_random_str(20),
                 'identifier': get_random_str(10),
             }
-            with open(os.path.join("test_folder", filename), 'w') as f2:
+            with open(os.path.join(test_folder_path, filename), 'w') as f2:
                 f2.write(get_random_str(file_size))
     
             csv_writer.writerow(metadata)
     
     t1 = time.time()
     # generate opex files
-    with open("test_folder/metadata.csv", newline='') as f:
+    with open(os.path.join(test_folder_path, "metadata.csv"), newline='') as f:
         csv_reader = csv.DictReader(f)
         for i, row in enumerate(csv_reader):
             general_metadata = model.OpexMetadataContent(
@@ -53,12 +54,14 @@ def perf_test():
                     source_id = "test_folder_"+str(i))
 
             fs_metadata =\
-                model.OpexFileContent.from_fs(f"test_folder/{row['filename']}", 
+                model.OpexFileContent.from_fs(os.path.join(test_folder_path, row['filename']), 
                                                         ['MD5', 'SHA-256'])
-            opex_writer = writer.Writer(f"test_folder/{row['filename']}.opex", is_dir = False)
+            opex_writer = writer.Writer(os.path.join(test_folder_path,
+                                                     f"{row['filename']}.opex"),
+                                        is_dir = False, is_pax=False)
             opex_writer.write(general_metadata, fs_metadata)
-    fs_metadata = model.OpexFolderContent.from_fs("test_folder")
-    writer.Writer("test_folder/test_folder.opex", is_dir=True).write(None, fs_metadata)
+    fs_metadata = model.OpexFolderContent.from_fs(test_folder_path)
+    writer.Writer(os.path.join(test_folder_path, "test_folder.opex"), is_dir=True, is_pax=False).write(None, fs_metadata)
     t2 = time.time()
     print(f"# of files: {file_num}\nfile size: {file_size}\ntime taken:" 
           f" {t2 -t1}\nfiles/sec: {file_num/(t2-t1)}\nbytes/sec:"
@@ -66,7 +69,8 @@ def perf_test():
     
 
 def test_print_all_titles():
-    test_dir = "testfiles/oaipmh-storage"
+    test_dir = os.path.join(os.path.dirname(__file__),
+                            "testfiles/oaipmh-storage")
     
     for root, _, fnames in os.walk(test_dir):
         for fname in fnames:
@@ -85,8 +89,8 @@ def test_print_all_titles():
                 print(metadata, fixity)
 
 def test_reader_writer_roundtrip():
-    file_path = "example.opex"
-    out_path = "out_" + file_path
+    file_path = os.path.join(os.path.dirname(__file__), "example.opex")
+    out_path = os.path.join(os.path.dirname(__file__), "out_example.opex")
     read_obj = reader.Reader(file_path)
     metadata, file_content = read_obj.get_contents()
     print(metadata, file_content, out_path)
@@ -110,9 +114,9 @@ def test_reader_writer_roundtrip():
 
 
 def test_print_checksum():
-    filename = ("testfiles/oaipmh-storage/"
+    filename = os.path.join(os.path.dirname(__file__), ("testfiles/oaipmh-storage/"
         "oai_d-scholarship.pitt.edu_13560/"
-        "files/GOLDBERG_-_SOUL_SEARCHER.pdf")
+        "files/GOLDBERG_-_SOUL_SEARCHER.pdf"))
     opex_filename = filename + ".opex"
     read_obj = reader.Reader(opex_filename)
     _, file_metadata = read_obj.get_contents()
@@ -134,4 +138,4 @@ def test():
         print("="*100)
         globals()[_test]()
 if __name__ == '__main__':
-    perf_test()
+    test_perf()
