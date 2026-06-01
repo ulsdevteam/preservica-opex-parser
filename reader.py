@@ -31,7 +31,7 @@ class Reader:
             fs_content = model.OpexFolderContent.from_xml(self.tree)
         else:
             fs_content = model.OpexFileContent.from_xml(self.tree)
-            print(fs_content)
+            #print(fs_content) debug
         return metadata, fs_content
     '''
     @staticmethod

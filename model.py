@@ -54,7 +54,7 @@ class OpexMetadataContent:
         
         for i, field in enumerate(named_tuple_fields):
             field_val = getattr(self, field)
-            print(field, field_val)
+            #print(field, field_val)
             if field_val is None:
                 continue
             match field:
@@ -476,8 +476,6 @@ class OpexXmlHelper:
         # prepend_ns
         name = '/'.join('opex:' + x for x in name.split('/'))
         tag = tree.find(name, namespaces = OpexXmlHelper.ns_dict)
-        if tag is None:
-            print(tag)
         return tag
     
     
