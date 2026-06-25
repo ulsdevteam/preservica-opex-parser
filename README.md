@@ -1,12 +1,38 @@
+## Quick Start
+
+1. Clone repo into source directory
+
+```
+git clone https://github.com/ulsdvevteam/preservica-opex-parser
+```
+
+2. 
+
 ## Introduction
 
 Preservica is a long term storage and archival 
-solution used by several library systems and corporations.
+solution. Ingestion of content into Preservica can be done
+either file by file using the WebUI or in bulk folder uploads.
 
-This repository aims to provide a more convenient 
-interface for creating and handling OPEX files
+Aside from content ingestion for preservation, we would also want
+the uploaded content to have metadata associated with it, as 
+well as ensure that the content is not corrupted or partially 
+uploaded. For small upload manual checking and manual 
+metadata entry is feasible, but for bulk content, a proper
+manifest and metadata solution is required.
+
+OPEX is the manifest and metadata solution provided by Preservica.
+This library aims to make interaction with the 
+OPEX Standard more convenient.
+
 
 ## What is OPEX
+
+For any file or folder being uploaded to Preservica, one can 
+put a corresponding XML file `file.opex` or `folder.opex` containing
+manifest and metadata information about the file or folder.
+
+
 
 An opex package is a folder containing files that consists
 of some content meant to be archived. The contents of the

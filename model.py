@@ -7,14 +7,19 @@ import os
 from lxml.builder import ElementMaker
 import hashlib
 
+
+
 class MetadataContentOpexFragments(NamedTuple):
+    """
+    XML Fragments passed to reader and writer.
+    Meant for internal use
+    """
     title: Optional[etree._Element] 
     description: Optional[etree._Element] # <Description> ... </Description>
     source_id: Optional[etree._Element]
     security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
     identifiers: Optional[etree._Element] 
     descriptive_metadata: Optional[etree._ElementTree]
-    pass
 
 class FileContentOpexFragments(NamedTuple):
     original_filename: Optional[etree._Element]
@@ -156,13 +161,14 @@ class OpexFileContent:
             hash_values.append(digest)
         return cls(filename, hash_names, hash_values)
     
-    
+    '''
     @classmethod
     def from_fs_pax(self, pax_file, pax_file_list):
         """ Unzip pax file at `pax_file` and generate paths and
         fixities for files within zipped pax object"""
         assert pax_file.endswith(".pax.zip")
         raise NotImplementedError()
+    '''
 
     def as_xml_fragments(self) -> FileContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
@@ -263,6 +269,7 @@ class OpexFolderContent:
             
         return cls(file_path, subdirs, subfiles, subfile_sizes, subfile_types)
     
+    '''
     @classmethod
     def from_fs_pax(cls, base_path, file_paths, folder_paths):
         # let user tell me paths
@@ -290,6 +297,7 @@ class OpexFolderContent:
 
         return cls(None, subfolder_names, subfile_names, 
                    subfile_sizes, subfile_types)
+    '''
                 
             
     @classmethod
@@ -361,6 +369,7 @@ class OpexPaxContent:
             "SHA-512": hashlib.sha512,
             "MD5": hashlib.md5,
         }
+
         hash_names = []
         hash_values = []
         fixity_paths = []
