@@ -7,32 +7,104 @@ import os
 from lxml.builder import ElementMaker
 import hashlib
 
+from enum import Enum
 
-
-class MetadataContentOpexFragments(NamedTuple):
+class OpexXMLFragments(Enum):
     """
-    XML Fragments passed to reader and writer.
-    Meant for internal use
+    These classes are primarily meant for internal use.
+
+    The writer API expect the model dataclasses
+    to have an `as_xml_fragments` method which converts the
+    metadata stored in dataclasses (as native python types)
+    to XML fragments i.e. lxml Elements. 
+
+    This makes the writer's job simpler by having it focus
+    on mainly putting lxml elements in the correct place in 
+    the correct order and not have to concern itself
+    with the specifics of data layout or data serialization
+
+    An OpexXMLFragment describes 1 of 4 named tuples, one
+    for the descriptive metadata fields, and one each for 
+    the administrative metadata of each type of object an
+    opex file can describe (file, folder, pax).
+
+    The elements of the named tuples themselves map onto 
+    an OPEX XML tagnames.
     """
-    title: Optional[etree._Element] 
-    description: Optional[etree._Element] # <Description> ... </Description>
-    source_id: Optional[etree._Element]
-    security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
-    identifiers: Optional[etree._Element] 
-    descriptive_metadata: Optional[etree._ElementTree]
 
-class FileContentOpexFragments(NamedTuple):
-    original_filename: Optional[etree._Element]
-    fixities: Optional[etree._Element]
+    class MetadataContentOpexFragments(NamedTuple):
+        """
+        OPEX tags that correspond to Descriptive Metadata 
+        of an object i.e. metadata that provides facts about
+        the object. Note that this is distinct from the 
+        DescriptiveMetadata tag of OPEX as it includes 
+        tags like title and description. 
 
-class FolderContentOpexFragments(NamedTuple):
-    original_filename: Optional[etree._Element]
-    manifest: Optional[etree._Element]
+        The DescriptiveMetadata tag can contain arbitrary XML
+        that a user can add to provide additional XML metadata,
+        that the user wants to be archived
+        """
+        title: Optional[etree._Element] 
+        description: Optional[etree._Element] # <Description> ... </Description>
+        source_id: Optional[etree._Element]
+        identifiers: Optional[etree._Element] 
+        descriptive_metadata: Optional[etree._ElementTree]
 
-class PaxContentOpexFragments(NamedTuple):
-    original_filename: Optional[etree._Element]
-    manifest: Optional[etree._Element]
-    fixities: Optional[etree._Element]
+    class FileContentOpexFragments(NamedTuple):
+        """
+        Opex tags corresponding to Administrative Metadata
+        of files.
+
+        Files are atoms and don't contain further items within
+        them. Thus they do not possess a manifest tag 
+        and only contain fixities.
+        """
+        original_filename: Optional[etree._Element]
+        security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
+        fixities: Optional[etree._Element]
+
+    class FolderContentOpexFragments(NamedTuple):
+        """
+        Opex tags corresponding to Administrative Metadata
+        of folders.
+        
+        Folders can contain files and folders within them, but
+        don't contain any content. Thus they have a manifest, but
+        no fixities.
+        """
+        original_filename: Optional[etree._Element]
+        security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
+        manifest: Optional[etree._Element]
+
+    class PaxContentOpexFragments(NamedTuple):
+        """
+        Opex tags corresponding to Administrative Metadata
+        of PAX objects.
+
+        Pax objects can either be zipped files or folders,
+        that contain one or more files corresponding to structural
+        metadata of the object. They may have a manifest that 
+        enumerates content files within the PAX object as 
+        well as possibly fixities for the content files.
+
+        Note that paths in the mainfest for PAX objects
+        are unlike those for regular folders, as regular folders
+        only allow direct children of the folder to be in the
+        manifest for that folder, while PAX manifests can contain
+        files that are multiple folders deep.
+        """
+        original_filename: Optional[etree._Element]
+        security_descriptor: etree._Element # <SecurityDescriptor>...</Sec...>
+        manifest: Optional[etree._Element]
+        fixities: Optional[etree._Element]
+    
+    DescriptiveFragments = MetadataContentOpexFragments
+    AdministrativeFragmentsFile = FileContentOpexFragments
+    AdministrativeFragmentsFolder = FolderContentOpexFragments
+    AdministrativeFragmentsPAX = PaxContentOpexFragments
+
+    def __call__(self, *args, **kwargs):
+        return self.value(*args, **kwargs)
     
 
 @dataclass
