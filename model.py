@@ -1,7 +1,7 @@
 
 import copy
 from dataclasses import dataclass, fields
-from typing import Optional, Self, NamedTuple
+from typing import Optional, Self, NamedTuple, NewType
 import lxml.etree as etree
 import os
 from lxml.builder import ElementMaker
@@ -107,6 +107,64 @@ class OpexXMLFragments(Enum):
         return self.value(*args, **kwargs)
     
 
+class HashAlgorithm(Enum):
+    md5 = 'MD5'
+    sha256 = 'SHA-256'
+    sha512 = 'SHA-512'
+    sha1 = 'SHA-1'
+
+# tags with attributes are reoresented via 
+# dataclasses with slots = True
+class CompoundTags:
+    @dataclass(slots=True)
+    class Identifier:
+        value: str
+        type: Optional[str]
+    
+    
+    @dataclass(slots=True)
+    class FileFixity:
+        alg: HashAlgorithm
+        value: str
+    
+    @dataclass(slots = True)
+    class PaxFixity:
+        alg: HashAlgorithm
+        value: str
+        path: str
+    
+
+    class Fixity(Enum):
+        pax = PaxFixity
+        file = FileFixity
+        pass
+
+    
+    # type alias
+    class PaxPath(str):
+        pass 
+    
+    ## maifest: list[folder] + list[file]
+    @dataclass(slots= True)
+    class ManifestFile:
+        path: str | PaxPath
+        size: int
+        type: str
+
+        def uses_pax_path(self) -> bool:
+            return isinstance(self, PaxPath)
+        
+        pass
+    def __new__(cls, *args, **kwargs):
+        raise RuntimeError("This class is a namespace "
+                           "wrapper and not meant to be instantiated")
+
+
+class OpexMetadata(Enum):
+    """
+
+    """
+
 @dataclass
 class OpexMetadataContent:
     # a class to represent the content within an opex file independent
@@ -117,6 +175,7 @@ class OpexMetadataContent:
     security_descriptor: str = ""
     identifiers: list[Optional[str]] = None
     identifier_types: list[Optional[str]] = None
+    #identifiers: list[COmpoundTags.Identifier]
     descriptive_metadata: etree._ElementTree = None
     
 
@@ -207,6 +266,7 @@ class OpexFileContent:
     # a class to represent opex content associated with 
     # file existing within filesystem
     original_filename: str
+    #fixities: list[CompoundTags.Fixity]
     fixity_algs: list[str]
     fixity_values: list[str]
     fixity_paths: Optional[list[str]] = None
