@@ -113,6 +113,20 @@ class HashAlgorithm(Enum):
     sha512 = 'SHA-512'
     sha1 = 'SHA-1'
 
+    def as_hashlib(self):
+        match self.value:
+            case 'MD5':
+                return hashlib.md5
+            case 'SHA-256':
+                return hashlib.sha256
+            case 'SHA-512':
+                return hashlib.sha512
+            case 'SHA-1':
+                return hashlib.sha1
+
+    def hexdigest(self, content):
+        return self.as_hashlib()(content).hexdigest
+
 # tags with attributes are reoresented via 
 # dataclasses with slots = True
 class CompoundTags:
@@ -173,9 +187,9 @@ class OpexMetadataContent:
     description: Optional[str]
     source_id: str
     security_descriptor: str = ""
-    identifiers: list[Optional[str]] = None
-    identifier_types: list[Optional[str]] = None
-    #identifiers: list[COmpoundTags.Identifier]
+    #identifiers: list[Optional[str]] = None
+    #identifier_types: list[Optional[str]] = None
+    identifiers: list[CompoundTags.Identifier]
     descriptive_metadata: etree._ElementTree = None
     
 
@@ -183,7 +197,6 @@ class OpexMetadataContent:
         builder = OpexXmlHelper.opex_builder
         named_tuple_fields = [field.name for field in fields(self)]
         #print(named_tuple_fields)
-        named_tuple_fields.remove("identifier_types")
         #ret_type = namedtuple("Fragments", named_tuple_fields)
         ret_type = MetadataContentOpexFragments
         ret = [None]*len(named_tuple_fields)
@@ -208,14 +221,11 @@ class OpexMetadataContent:
                     ret[i].text = field_val
                 case "identifiers":
                     ret[i] = builder("Identifiers")
-                    id_types = self.identifier_types
-                    if id_types is None:
-                        id_types = [None]*len(self.identifiers)
                         
-                    for value, id_type in zip(self.identifiers,
-                            id_types):
+                    for identifier in self.identifiers:
                         id_tag = builder("Identifier")
-                        id_tag.text = value
+                        id_tag.text = identifer.value
+                        id_type = identifier.type
                         if id_type is not None:
                             id_tag.set("type", id_type)
                         ret[i].append(id_tag)
@@ -232,6 +242,7 @@ class OpexMetadataContent:
         if isinstance(subtree, etree._ElementTree):
             subtree = subtree.getroot()
         self.descriptive_metadata.append(subtree)
+
     @classmethod
     def from_xml(cls, tree):
         title = OpexXmlHelper.find(tree, "Properties/Title")
@@ -249,49 +260,39 @@ class OpexMetadataContent:
         
         descriptive_metadata = OpexXmlHelper.find(tree, "DescriptiveMetadata")
         identifiers = []
-        identifier_types = []
         identifiers_el = OpexXmlHelper.find(tree, "Properties/Identifiers")
         if identifiers_el is None:
             identifiers_el = []
             
         for identifier_el in identifiers_el:
-            identifiers.append(identifier_el.text)
-            identifier_types.append(identifier_el.get("type"))
+            identifiers.append(CompoundTags.Identifier(value=identifier_el.text,
+                                                       type=identifier_el.get("type")))
         return cls(title, description,  source_id, 
                 security_descriptor, identifiers, 
-                identifier_types, descriptive_metadata)
+                descriptive_metadata)
         
 @dataclass
 class OpexFileContent:
     # a class to represent opex content associated with 
     # file existing within filesystem
     original_filename: str
-    #fixities: list[CompoundTags.Fixity]
-    fixity_algs: list[str]
-    fixity_values: list[str]
-    fixity_paths: Optional[list[str]] = None
-    describes_pax:bool = False
+    fixities: list[CompoundTags.Fixity]
+    #fixity_algs: list[str]
+    #fixity_values: list[str]
+    #fixity_paths: Optional[list[str]] = None
     
     @classmethod
     def from_fs(cls, file_path, fixity_algs):
         assert os.path.exists(file_path) and os.path.isfile(file_path)
         filename = os.path.basename(file_path)
-        alg_dict = {
-            "SHA-1": hashlib.sha1,
-            "SHA-256": hashlib.sha256,
-            "SHA-512": hashlib.sha512,
-            "MD5": hashlib.md5,
-        }
-        hash_names = []
-        hash_values = []
+        fixity_list = []
         with open(file_path, "rb") as f:
             content = f.read()
-        for alg in fixity_algs:
-            assert alg in alg_dict
-            digest = alg_dict[alg](content).hexdigest()
-            hash_names.append(alg)
-            hash_values.append(digest)
-        return cls(filename, hash_names, hash_values)
+        for alg_name in fixity_algs:
+            alg = HashAlgorithm(alg_name)
+            digest = alg.hexdigest(content)
+            fixity_list.append(CompoundTags.Fixity.File.value(alg_name, digest))
+        return cls(filename, fixity_list)
     
     '''
     @classmethod
@@ -315,14 +316,11 @@ class OpexFileContent:
         
         ret[1] = builder("Fixities")
          
-        for i, (alg, value) in enumerate(zip(self.fixity_algs,
-                                             self.fixity_values)):
+        for fixity in self.fixities:
             fixity_tag = builder("Fixity")
-            fixity_tag.set("type", alg)
-            fixity_tag.set("value", value)
-            if self.describes_pax:
-                fixity_tag.set("path", self.fixity_paths[i])
-            ret[1].append(fixity_tag)
+            fixity_tag.set("type", fixity.type)
+            fixity_tag.set("value", fixity.value)
+            ret[1].append(fixity)
         return ret_type._make(ret)
 
     @classmethod
@@ -331,14 +329,14 @@ class OpexFileContent:
         if filename is not None:
             filename = filename.text
         fixities_element = OpexXmlHelper.find(tree, "Transfer/Fixities")
-        hash_names = []
-        hash_values = []
+        fixities_list = []
         if fixities_element is None:
             return cls(filename, hash_names, hash_values)
         for fixity_el in fixities_element:
-            hash_names.append(fixity_el.get("type"))
-            hash_values.append(fixity_el.get("value"))
-        return cls(filename, hash_names, hash_values)
+            fixities_list.append(CompoundTags.Fixity.File.value(
+                type=fixity_el.get("type"),
+                value=fixity_el.get("value")))
+        return cls(filename, fixities_list)
             
 @dataclass
 class OpexFolderContent:
@@ -485,13 +483,12 @@ class OpexPaxContent:
     original_filename: str
     subfolder_names: list[str]
     
+    subfiles: list[CompoundTags.ManifestFile]
     subfile_names: list[str]
     subfile_sizes: list[int]
     subfile_types: list[str]
 
-    fixity_algs: list[str]
-    fixity_values: list[str]
-    fixity_paths: list[str] = None
+    fixities: list[CompoundTag.PaxFixity]
 
     @classmethod
     def from_fs(cls, pax_path, algs):
