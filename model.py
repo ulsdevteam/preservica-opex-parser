@@ -31,8 +31,9 @@ class OpexXMLFragments(Enum):
     The elements of the named tuples themselves map onto 
     an OPEX XML tagnames.
     """
-
-    class MetadataContentOpexFragments(NamedTuple):
+    
+    @dataclass(slots=True)
+    class MetadataContentOpexFragments:
         """
         OPEX tags that correspond to Descriptive Metadata 
         of an object i.e. metadata that provides facts about
@@ -44,13 +45,14 @@ class OpexXMLFragments(Enum):
         that a user can add to provide additional XML metadata,
         that the user wants to be archived
         """
-        title: Optional[etree._Element] 
-        description: Optional[etree._Element] # <Description> ... </Description>
-        source_id: Optional[etree._Element]
-        identifiers: Optional[etree._Element] 
-        descriptive_metadata: Optional[etree._ElementTree]
+        title: Optional[etree._Element] = None 
+        description: Optional[etree._Element] = None# <Description> ... </Description>
+        source_id: Optional[etree._Element] = None
+        identifiers: Optional[etree._Element] = None
+        descriptive_metadata: Optional[etree._ElementTree] = None
 
-    class FileContentOpexFragments(NamedTuple):
+    @dataclass(slots=True)
+    class FileContentOpexFragments:
         """
         Opex tags corresponding to Administrative Metadata
         of files.
@@ -186,103 +188,114 @@ class OpexMetadataContent:
     title: Optional[str]
     description: Optional[str]
     source_id: str
-    security_descriptor: str = ""
-    #identifiers: list[Optional[str]] = None
-    #identifier_types: list[Optional[str]] = None
     identifiers: list[CompoundTags.Identifier]
     descriptive_metadata: etree._ElementTree = None
     
 
-    def as_xml_fragments(self: Self) -> MetadataContentOpexFragments:
+    def as_xml_fragments(self: Self
+                        ) -> OpexXMLFragments.DescriptiveFragment:
+        """
+        Serialize fields of self into OPEX XML tags, as 
+        lxml elements. 
+
+        Input: self
+        Output: Dataclass consisting of Opex Elements, populated
+        by fields of self
+        """
         builder = OpexXmlHelper.opex_builder
-        named_tuple_fields = [field.name for field in fields(self)]
-        #print(named_tuple_fields)
-        #ret_type = namedtuple("Fragments", named_tuple_fields)
-        ret_type = MetadataContentOpexFragments
-        ret = [None]*len(named_tuple_fields)
+        self_fields = [field.name for field in fields(self)]
+        ret = OpexXMLFragments.DescriptiveFragment()
         
-        for i, field in enumerate(named_tuple_fields):
+        for i, field in enumerate(self_fields):
             field_val = getattr(self, field)
             #print(field, field_val)
             if field_val is None:
                 continue
             match field:
                 case "title":
-                    ret[i] = builder("Title")
-                    ret[i].text = field_val
+                    ret.title = builder("Title")
+                    ret.title.text = field_val
                 case "description":
-                    ret[i] = builder("Description")
-                    ret[i].text = field_val
+                    ret.description = builder("Description")
+                    ret.description.text = field_val
                 case "source_id":
-                    ret[i] = builder("SourceID")
-                    ret[i].text = field_val
-                case "security_descriptor":
-                    ret[i] = builder("SecurityDescriptor")
-                    ret[i].text = field_val
+                    ret.source_id = builder("SourceID")
+                    ret.source_id.text = field_val
                 case "identifiers":
-                    ret[i] = builder("Identifiers")
+                    ret.identifiers = builder("Identifiers")
                         
                     for identifier in self.identifiers:
                         id_tag = builder("Identifier")
                         id_tag.text = identifer.value
-                        id_type = identifier.type
-                        if id_type is not None:
-                            id_tag.set("type", id_type)
-                        ret[i].append(id_tag)
+                        if identifier.type is not None:
+                            id_tag.set("type", identifier.type)
+                        ret.identifiers.append(id_tag)
                         
                 case "descriptive_metadata":
-                    ret[i] = field_val
-        return ret_type._make(ret)
+                    self.append_descriptive_metadata(field_val)
+                else:
+                    continue
+        return ret
         
-    def append_descriptive_metadata(self, subtree):
+    def append_descriptive_metadata(self, subtree:etree._Element |
+                                    etree._ElementTree):
+        if isinstance(subtree, etree._ElementTree):
+            subtree = subtree.getroot()
         subtree = copy.deepcopy(subtree)
         if self.descriptive_metadata is None:
             self.descriptive_metadata = (
                 OpexXmlHelper.opex_builder("DescriptiveMetadata"))
-        if isinstance(subtree, etree._ElementTree):
-            subtree = subtree.getroot()
         self.descriptive_metadata.append(subtree)
 
     @classmethod
-    def from_xml(cls, tree):
+    def from_xml(cls, tree: lxml._ElementTree | lxml._Element):
+        """
+        Deserialize an OPEX XML document and extract it's 
+        properties associated with descriptive metadata.
+        Note that find is agnostic to element tree or element.
+        """
+        ret = cls()
+
+        # getattr(x, y, z) == x.y if x.y possible else z
+        # so if x is None, getattr(x, y, z) == z
+
         title = OpexXmlHelper.find(tree, "Properties/Title")
-        if title is not None:
-            title = title.text
+        ret.title = getattr(title, "text", None)
+
         description = OpexXmlHelper.find(tree, "Properties/Description")
-        if description is not None:
-            description = description.text
+        ret.description = getattr(description, "text", None)
+
         source_id = OpexXmlHelper.find(tree, "Transfer/SourceID")
-        if source_id is not None:
-            source_id = source_id.text
-        security_descriptor = OpexXmlHelper.find(tree, "Properties/SecurityDescriptor")
-        if security_descriptor is not None:
-            security_descriptor = security_descriptor.text
-        
+        ret.source_id = getattr(source_id, "text", None)
+
         descriptive_metadata = OpexXmlHelper.find(tree, "DescriptiveMetadata")
+        ret.append_descriptive_metadata(descriptive_metadata)
+
         identifiers = []
         identifiers_el = OpexXmlHelper.find(tree, "Properties/Identifiers")
         if identifiers_el is None:
             identifiers_el = []
             
         for identifier_el in identifiers_el:
-            identifiers.append(CompoundTags.Identifier(value=identifier_el.text,
-                                                       type=identifier_el.get("type")))
-        return cls(title, description,  source_id, 
-                security_descriptor, identifiers, 
-                descriptive_metadata)
-        
+            identifier_data = CompounTags.Identifier(
+                    value = identifier_el.text,
+                    type = identifier_el.get("type")
+                    )
+            identifiers.append(identifier_data)
+        return ret       
 @dataclass
 class OpexFileContent:
     # a class to represent opex content associated with 
     # file existing within filesystem
-    original_filename: str
-    fixities: list[CompoundTags.Fixity]
+    original_filename: Optional[str] = None
+    security_descriptor: str = ""
+    fixities: list[CompoundTags.Fixity] = []
     #fixity_algs: list[str]
     #fixity_values: list[str]
     #fixity_paths: Optional[list[str]] = None
     
     @classmethod
-    def from_fs(cls, file_path, fixity_algs):
+    def from_fs(cls, file_path, fixity_algs, security_descriptor = ""):
         assert os.path.exists(file_path) and os.path.isfile(file_path)
         filename = os.path.basename(file_path)
         fixity_list = []
@@ -292,7 +305,7 @@ class OpexFileContent:
             alg = HashAlgorithm(alg_name)
             digest = alg.hexdigest(content)
             fixity_list.append(CompoundTags.Fixity.File.value(alg_name, digest))
-        return cls(filename, fixity_list)
+        return cls(filename, fixity_list, security_descriptor)
     
     '''
     @classmethod
@@ -305,53 +318,56 @@ class OpexFileContent:
 
     def as_xml_fragments(self) -> FileContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
-        named_tuple_fields = ["original_filename", "fixities"]
-        ret_type = FileContentOpexFragments
-        #ret_type = namedtuple("Fragments", named_tuple_fields)
-        
-        ret = [None]*len(named_tuple_fields)
+        ret = OpexXMLFragments.AdministrativeFragmentsFile.value()
+
         if self.original_filename is not None:
-            ret[0] = builder("OriginalFilename")
-            ret[0].text = self.original_filename
+            ret.original_filename = builder("OriginalFilename")
+            ret.original_filename.text = self.original_filename
         
-        ret[1] = builder("Fixities")
+        ret.security_descriptor = builder("SecurityDescriptor")
+        ret.security_descriptor.text = self.security_descriptor
+        ret.fixities = builder("Fixities")
          
         for fixity in self.fixities:
             fixity_tag = builder("Fixity")
             fixity_tag.set("type", fixity.type)
             fixity_tag.set("value", fixity.value)
-            ret[1].append(fixity)
-        return ret_type._make(ret)
+            ret.fixities.append(fixity)
+        return ret
 
     @classmethod
     def from_xml(cls, tree):
+        ret = cls()
         filename = OpexXmlHelper.find(tree, "Transfer/OriginalFilename")
-        if filename is not None:
-            filename = filename.text
+        ret.filename = getattr(filename, "text", None)
+
+        security_descriptor = OpexXmlHelper.find(tree, 
+                                        "Transfer/SecurityDescriptor")
+        
+        ret.security_descriptor = getattr(security_descriptor, "text", "")
         fixities_element = OpexXmlHelper.find(tree, "Transfer/Fixities")
         fixities_list = []
         if fixities_element is None:
-            return cls(filename, hash_names, hash_values)
+            fixities_element = []
         for fixity_el in fixities_element:
             fixities_list.append(CompoundTags.Fixity.File.value(
                 type=fixity_el.get("type"),
                 value=fixity_el.get("value")))
-        return cls(filename, fixities_list)
+        ret.fixities = fixities_list
+        return ret
             
 @dataclass
 class OpexFolderContent:
     original_filename: str
+    security_descriptor: str
     subfolder_names: list[str]
     
-    subfile_names: list[str]
-    subfile_sizes: list[int]
-    subfile_types: list[str]
-    describes_pax:bool = False
+    subfiles: list[CompoundTag.ManifestFile]
     
     # todo: check if original filename is stored with folder opex
     def as_xml_fragments(self) -> FolderContentOpexFragments:
         builder = OpexXmlHelper.opex_builder
-        ret_type = FolderContentOpexFragments
+        ret_type = OpexXMLFragments.FolderContentOpexFragments
         #ret_type = namedtuple("Fragment", ["original_filename", "manifest"])
         ret = [None, None]
         if self.original_filename is not None:
@@ -610,7 +626,7 @@ class OpexXmlHelper:
     )
     
     @staticmethod
-    def find(tree, name):
+    def find(tree: etree._Element | etree._ElementTree, name: str):
         # prepend_ns
         name = '/'.join('opex:' + x for x in name.split('/'))
         tag = tree.find(name, namespaces = OpexXmlHelper.ns_dict)
