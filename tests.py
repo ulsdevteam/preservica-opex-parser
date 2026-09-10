@@ -1,11 +1,12 @@
 
 import shutil
 import hashlib
-from . import model, reader, writer
+from opex_parser import model, reader, writer
+from opex_parser.model_types import CompoundTags
 import os.path
 import os
 import lxml.etree as etree
-import rich
+#import rich
 import time
 import random
 import csv
@@ -49,8 +50,7 @@ def test_perf():
             general_metadata = model.OpexMetadataContent(
                     title = row['title'], 
                     description = row['description'], 
-                    identifiers = [row['identifier']], 
-                    identifier_types = None, 
+                    identifiers = [CompoundTags.Identifier(row['identifier'])], 
                     source_id = "test_folder_"+str(i))
 
             fs_metadata =\

@@ -1,8 +1,6 @@
-from . import model
-#import model
-from .model import OpexXmlHelper
-from lxml import etree
 import logging
+
+from . import model
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ class Writer:
     @staticmethod 
     def generate_etree(general_metadata: model.OpexMetadataContent, 
             fs_metadata: model.OpexFileContent, is_dir, is_pax):
-        builder = OpexXmlHelper.opex_builder
+        builder = model.OpexXmlHelper.opex_builder
         general_fragments = _StubObj()
         fs_fragments = _StubObj()
 
@@ -50,7 +48,7 @@ class Writer:
         properties = builder("Properties")
         _append_skip_none(properties, general_fragments.title)
         _append_skip_none(properties, general_fragments.description)
-        _append_skip_none(properties, general_fragments.security_descriptor)
+        _append_skip_none(properties, fs_fragments.security_descriptor)
         _append_skip_none(properties, general_fragments.identifiers)
         if len(properties) == 0:
             properties = None
