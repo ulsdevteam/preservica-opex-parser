@@ -343,7 +343,7 @@ class OpexPaxContent:
                 content = f.read()
             for alg in algs:
                 digest = alg.hexdigest(content)
-                fixities.append(model_types.CompoundTags.Fixity.PaxFixity(
+                fixities.append(model_types.CompoundTags.Fixity.pax.value(
                     alg, 
                     digest, 
                     os.path.relpath(file_path, pax_path)
@@ -385,7 +385,7 @@ class OpexPaxContent:
         if fixities_el is not None:
             for fixity_el in fixities_el:
                 fixities.append(
-                    model_types.CompoundTags.Fixity.PaxFixity(
+                    model_types.CompoundTags.Fixity.pax.value(
                         alg = HashAlgorithm(fixity_el.get("type")),
                         digest = fixity_el.get("value"),
                         path = fixity_el.get("path")
