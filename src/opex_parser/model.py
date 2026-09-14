@@ -309,6 +309,7 @@ def get_subfiles(folder, as_relative=True):
                 paths.append(relpath)
                 continue
             paths.append(fullpath)
+    return paths
 
 
 @dataclass
@@ -337,7 +338,7 @@ class OpexPaxContent:
             assert os.path.exists(full_path)
             subfolder_names.append(path)
 
-        for file_path in get_subfiles(pax_path, relative=False): 
+        for file_path in get_subfiles(pax_path, as_relative=False): 
             with open(file_path, "rb") as f:
                 content = f.read()
             for alg in algs:
