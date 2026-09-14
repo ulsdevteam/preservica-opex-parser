@@ -350,15 +350,15 @@ class OpexPaxContent:
                 ))
             # add in manifest
 
-            full_path = os.path.join(pax_path, file_path)
-
-            assert os.path.exists(full_path)
-            size = os.stat(full_path).st_size
-            filetype = "metadata" if full_path.endswith(".opex") else "content"
-            path = os.path.basename(full_path)
+            #full_path = os.path.join(pax_path, file_path)
+            #print(full_path, pax_path, file_path)
+            assert os.path.exists(file_path)
+            size = os.stat(file_path).st_size
+            filetype = "metadata" if file_path.endswith(".opex") else "content"
+            path = os.path.relpath(file_path, pax_path)
             subfiles.append(
                 model_types.CompoundTags.ManifestFile(
-                        path,
+                        model_types.PaxPath(path),
                         size,
                         filetype
                     )
@@ -420,7 +420,7 @@ class OpexPaxContent:
                                          self.security_descriptor
                                          ).as_xml_fragments()
         folder_fragments = OpexFolderContent(self.original_filename, 
-                                             self.securiy_descriptor,
+                                             self.security_descriptor,
                                              self.subfolder_names,
                                              self.fixities
                                             ).as_xml_fragments()
