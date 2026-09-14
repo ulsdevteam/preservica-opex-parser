@@ -149,8 +149,8 @@ class OpexFileContent:
         for alg_name in fixity_algs:
             alg = HashAlgorithm(alg_name)
             digest = alg.hexdigest(content)
-            print(CompoundTags.Fixity.file)
-            fixity_list.append(CompoundTags.Fixity.file(alg_name, digest))
+            #print(CompoundTags.Fixity.file)
+            fixity_list.append(CompoundTags.Fixity.file.value(alg_name, digest))
         return cls(filename, fixity_list, security_descriptor)
     
     '''
@@ -197,7 +197,7 @@ class OpexFileContent:
         if fixities_element is None:
             fixities_element = []
         for fixity_el in fixities_element:
-            fixities_list.append(CompoundTags.Fixity.file(
+            fixities_list.append(CompoundTags.Fixity.file.value(
                 alg=HashAlgorithm(fixity_el.get("type")),
                 digest=fixity_el.get("value")))
         ret.fixities = fixities_list
