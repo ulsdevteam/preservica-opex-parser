@@ -60,7 +60,9 @@ def test_perf():
                                                      f"{row['filename']}.opex"),
                                         is_dir = False, is_pax=False)
             opex_writer.write(general_metadata, fs_metadata)
+            print(general_metadata)
     fs_metadata = model.OpexFolderContent.from_fs(test_folder_path)
+    
     writer.Writer(os.path.join(test_folder_path, "test_folder.opex"), is_dir=True, is_pax=False).write(None, fs_metadata)
     t2 = time.time()
     print(f"# of files: {file_num}\nfile size: {file_size}\ntime taken:" 

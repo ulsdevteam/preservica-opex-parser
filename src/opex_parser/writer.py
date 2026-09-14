@@ -29,6 +29,7 @@ class Writer:
 
         if general_metadata is not None:
             general_fragments = general_metadata.as_xml_fragments()
+            print(general_fragments)
         if fs_metadata is not None:
             fs_fragments = fs_metadata.as_xml_fragments()
     

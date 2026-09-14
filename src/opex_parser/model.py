@@ -45,7 +45,7 @@ class OpexMetadataContent:
             #print(field, field_val)
             if field_val is None:
                 continue
-            match field:
+            match field_name:
                 case "title":
                     ret.title = builder("Title")
                     ret.title.text = field_val
@@ -69,6 +69,7 @@ class OpexMetadataContent:
                     self.append_descriptive_metadata(field_val)
                 case _:
                     continue
+        print(ret)
         return ret
         
     def append_descriptive_metadata(self, subtree:etree._Element |
@@ -148,7 +149,8 @@ class OpexFileContent:
         for alg_name in fixity_algs:
             alg = HashAlgorithm(alg_name)
             digest = alg.hexdigest(content)
-            fixity_list.append(CompoundTags.Fixity.file.value(alg_name, digest))
+            print(CompoundTags.Fixity.file)
+            fixity_list.append(CompoundTags.Fixity.file(alg_name, digest))
         return cls(filename, fixity_list, security_descriptor)
     
     '''
@@ -195,9 +197,9 @@ class OpexFileContent:
         if fixities_element is None:
             fixities_element = []
         for fixity_el in fixities_element:
-            fixities_list.append(CompoundTags.Fixity.File.value(
-                type=fixity_el.get("type"),
-                value=fixity_el.get("value")))
+            fixities_list.append(CompoundTags.Fixity.file(
+                alg=HashAlgorithm(fixity_el.get("type")),
+                digest=fixity_el.get("value")))
         ret.fixities = fixities_list
         return ret
             
@@ -242,12 +244,12 @@ class OpexFolderContent:
         
 
     @classmethod
-    def from_fs(cls: Self, file_path, security_descriptor = "", skip_pattern=None):
+    def from_fs(cls, file_path, security_descriptor = "", skip_pattern=None):
         root, subdirs, subfiles = next(os.walk(file_path))
         if skip_pattern is not None:
 
             skip_regex = re.compile(glob.translate(skip_pattern)) 
-            subdirs = list(filter(lambda x: not skip_regex.match(x). subdirs))
+            subdirs = list(filter(lambda x: not skip_regex.match(x), subdirs))
             subfiles = list(filter(lambda x: not skip_regex.match(x), subfiles))
         
         subfile_metadata = []
@@ -285,7 +287,7 @@ class OpexFolderContent:
         subfiles = []
         for file_el in files_el:
             file_obj = model_types.CompoundTags.ManifestFile(
-                name = file_el.text,
+                path = file_el.text,
                 size = int(file_el.get("size")),
                 type = file_el.get("type")
             )
@@ -313,13 +315,13 @@ def get_subfiles(folder, as_relative=True):
 class OpexPaxContent:
     # pax can have both fixities and manifest so a special case
     # makes sense
-    original_filename: str
+    original_filename: str | None
     security_descriptor: str
     subfolder_names: list[str]
     
     subfiles: list[CompoundTags.ManifestFile]
     
-    fixities: list[CompoundTags.PaxFixity]
+    fixities: list[CompoundTags.Fixity.PaxFixity]
 
     @classmethod
     def from_fs(cls, pax_path, algs: list[HashAlgorithm], security_descriptor = ""):
@@ -351,7 +353,8 @@ class OpexPaxContent:
 
             assert os.path.exists(full_path)
             size = os.stat(full_path).st_size
-            filetype = "metadata" if path.endswith(".opex") else "content"
+            filetype = "metadata" if full_path.endswith(".opex") else "content"
+            path = os.path.basename(full_path)
             subfiles.append(
                 model_types.CompoundTags.ManifestFile(
                         path,
@@ -368,11 +371,14 @@ class OpexPaxContent:
     @classmethod
     def from_xml(cls, tree):
         opex_helper = OpexXmlHelper
-        filename = opex_helper.find("Transfer/OriginalFilename")
+        filename = opex_helper.find(tree, "Transfer/OriginalFilename")
         if filename is not None:
             filename = filename.text
-        fixities_el = opex_helper.find("Transfer/Fixities")
-        manifest_el = opex_helper.find("Transfer/Manifest")
+
+        security_descriptor_el = opex_helper.find(tree, "Properties/SecurityDescriptor")
+        security_descriptor = getattr(security_descriptor_el, "text", "")
+        fixities_el = opex_helper.find(tree, "Transfer/Fixities")
+        manifest_el = opex_helper.find(tree, "Transfer/Manifest")
         fixities = []
         #ret_val = cls()
         if fixities_el is not None:
@@ -385,42 +391,45 @@ class OpexPaxContent:
                         )
                     )
                 
-        
+        subfolder_names = []
+        subfiles = []
         if manifest_el is not None:
             folders_el = opex_helper.find(manifest_el, "Folders")
             if folders_el is None:
                 folders_el = []
             for folder in folders_el:
-                ret_val.subfolder_names.append(folder.text)
+                subfolder_names.append(folder.text)
             
             files_el = opex_helper.find(manifest_el, "Files")
             if files_el is None:
                 files_el = []
 
             for file_el in files_el:
-                ret_val.subfile_names.append(file_el.text)
-                ret_val.subfile_sizes.append(int(file_el.get("size")))
-                ret_val.subfile_types.append(file_el.get("type"))
+                subfiles.append(CompoundTags.ManifestFile(
+                    path = file_el.text,
+                    size = int(file_el.get("size")),
+                    type = file_el.get("type")
+                ))
 
-        return ret_val
+        return cls(filename, security_descriptor, subfolder_names, subfiles, fixities)
 
     def as_xml_fragments(self):
         file_fragments = OpexFileContent(self.original_filename, 
-                                         self.fixity_algs, 
-                                         self.fixity_values
+                                         self.fixities,
+                                         self.security_descriptor
                                          ).as_xml_fragments()
         folder_fragments = OpexFolderContent(self.original_filename, 
-                                              self.subfolder_names, 
-                                              self.subfile_names,
-                                              self.subfile_sizes,
-                                              self.subfile_types
-                                              ).as_xml_fragments()
+                                             self.securiy_descriptor,
+                                             self.subfolder_names,
+                                             self.fixities
+                                            ).as_xml_fragments()
         # add in fixity paths
         if file_fragments.fixities is not None:
             for i, fixity_el in enumerate(file_fragments.fixities):
-                fixity_el.set("path", self.fixity_paths[i])
+                fixity_el.set("path", self.fixities[i])
 
-        return model_types.PAXFragments(self.original_filename, 
+        return model_types.PAXFragments(file_fragments.original_filename, 
+                                        file_fragments.security_descriptor,
                                        folder_fragments.manifest,
                                        file_fragments.fixities
                                        )
