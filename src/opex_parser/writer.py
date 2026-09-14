@@ -22,14 +22,14 @@ class Writer:
     
     @staticmethod 
     def generate_etree(general_metadata: model.OpexMetadataContent, 
-            fs_metadata: model.OpexFileContent, is_dir, is_pax):
+            fs_metadata: model.OpexFileContent | model.OpexFolderContent | model.OpexPaxContent, 
+            is_dir, is_pax):
         builder = model.OpexXmlHelper.opex_builder
         general_fragments = _StubObj()
         fs_fragments = _StubObj()
 
         if general_metadata is not None:
             general_fragments = general_metadata.as_xml_fragments()
-            print(general_fragments)
         if fs_metadata is not None:
             fs_fragments = fs_metadata.as_xml_fragments()
     
@@ -38,6 +38,7 @@ class Writer:
         transfer = builder("Transfer")
         _append_skip_none(transfer, general_fragments.source_id)
         if is_pax:
+            assert isinstance(fs_fragments, model.OpexPaxContent)
             _append_skip_none(transfer, fs_fragments.manifest)
             _append_skip_none(transfer, fs_fragments.fixities)
         elif is_dir:

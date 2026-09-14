@@ -132,8 +132,8 @@ class CompoundTags:
             alg: HashAlgorithm
             digest: str
             path: str
-        pax = PaxFixity
-        file = FileFixity
+        pax:type = PaxFixity
+        file:type = FileFixity
         
 
     
