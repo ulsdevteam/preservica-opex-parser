@@ -1,6 +1,7 @@
 import logging
 
 from . import model
+from .import model_types
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class Writer:
         transfer = builder("Transfer")
         _append_skip_none(transfer, general_fragments.source_id)
         if is_pax:
-            assert isinstance(fs_fragments, model.OpexPaxContent)
+            assert isinstance(fs_fragments, model_types.PAXFragments)
             _append_skip_none(transfer, fs_fragments.manifest)
             _append_skip_none(transfer, fs_fragments.fixities)
         elif is_dir:
