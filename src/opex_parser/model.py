@@ -171,7 +171,7 @@ class OpexFileContent:
             ret.original_filename.text = self.original_filename
         
         ret.security_descriptor = builder("SecurityDescriptor")
-        print(self.security_descriptor)
+        #print(self.security_descriptor)
         ret.security_descriptor.text = self.security_descriptor
         ret.fixities = builder("Fixities")
          
@@ -231,8 +231,8 @@ class OpexFolderContent:
 
         files_root = builder("Files")
         for filedata in self.subfiles:
-
             file_tag = builder("File")
+            #print(filedata)
             file_tag.text = filedata.path
             file_tag.set("size", str(filedata.size))
             file_tag.set("type", filedata.type)
@@ -422,12 +422,12 @@ class OpexPaxContent:
         folder_fragments = OpexFolderContent(self.original_filename, 
                                              self.security_descriptor,
                                              self.subfolder_names,
-                                             self.fixities
+                                             self.subfiles
                                             ).as_xml_fragments()
         # add in fixity paths
         if file_fragments.fixities is not None:
             for i, fixity_el in enumerate(file_fragments.fixities):
-                fixity_el.set("path", self.fixities[i])
+                fixity_el.set("path", self.fixities[i].path)
 
         return model_types.PAXFragments(file_fragments.original_filename, 
                                         file_fragments.security_descriptor,
