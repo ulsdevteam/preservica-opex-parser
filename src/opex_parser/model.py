@@ -365,8 +365,8 @@ class OpexPaxContent:
                 )
                 
 
-            filename = os.path.basename(pax_path)
-            return cls(filename, security_descriptor, subfolder_names, subfiles, fixities)
+        filename = os.path.basename(pax_path)
+        return cls(filename, security_descriptor, subfolder_names, subfiles, fixities)
         
 
     @classmethod
