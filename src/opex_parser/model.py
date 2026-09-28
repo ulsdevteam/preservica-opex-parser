@@ -73,7 +73,7 @@ class OpexMetadataContent:
                         ret.identifiers.append(id_tag)
                         
                 case "descriptive_metadata":
-                    self.append_descriptive_metadata(field_val)
+                    ret.descriptive_metadata = copy.deepcopy(self.descriptive_metadata)
                 case _:
                     continue
         print(ret)
