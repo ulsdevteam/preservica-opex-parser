@@ -17,8 +17,15 @@ from .model_types import HashAlgorithm, CompoundTags
 
 @dataclass
 class OpexMetadataContent:
-    # a class to represent the content within an opex file independent
-    # of xml
+    """
+    XML independent dataclass representation of Descriptive Metadata of an object.
+
+    Methods:
+
+    `as_xml_fragments`: serialize fields into lxml elements
+    `append_descriptive_metadata`: add an lxml Element to the DescriptiveMetadata opex tag.
+    `from_xml`: initialize object using a well formed opex xml document, opened using lxml
+    """
     title: str | None
     description: str | None
     source_id: str | None
@@ -74,6 +81,13 @@ class OpexMetadataContent:
         
     def append_descriptive_metadata(self, subtree:etree._Element |
                                     etree._ElementTree):
+        """
+        Append lxml element to DescriptiveMetadata tag.
+        argument `subtree` can be either 
+        - `lxml._Element` : the given element is appended to DescriptiveMetadata.
+        - `lxml._ElementTree`: the given element tree's root i.e. the entire 
+                            document is appended to DescriptiveMetadata
+        """
         if isinstance(subtree, etree._ElementTree):
             subtree = subtree.getroot()
         subtree = copy.deepcopy(subtree)
@@ -127,6 +141,12 @@ class OpexFileContent:
     """
     Metadata associated with the bytestream being put in preservation,
     i.e. the file being preserved. 
+
+    Methods:
+    `from_fs`: Construct object using properties derived from a filesystem file. 
+    `from_xml`: Construct object using well formed opex xml file
+    `set_security`: setter for the security descriptor to be used.
+    `as_xml_fragments`: serialize object into xml fragments. See also: model_types.FileFragments
     """
 
     # a class to represent opex content associated with 
@@ -140,7 +160,10 @@ class OpexFileContent:
         self.security_descriptor = level
 
     @classmethod
-    def from_fs(cls, file_path, fixity_algs, security_descriptor = ""):
+    def from_fs(cls, file_path, fixity_algs: list[str | model_types.HashAlgorithm], security_descriptor = ""):
+        """
+        Constructor for object using a fielsystem path, list of fixity algorithms 
+        """
         assert os.path.exists(file_path) and os.path.isfile(file_path)
         filename = os.path.basename(file_path)
         fixity_list = []
@@ -153,16 +176,11 @@ class OpexFileContent:
             fixity_list.append(CompoundTags.Fixity.file.value(alg_name, digest))
         return cls(filename, fixity_list, security_descriptor)
     
-    '''
-    @classmethod
-    def from_fs_pax(self, pax_file, pax_file_list):
-        """ Unzip pax file at `pax_file` and generate paths and
-        fixities for files within zipped pax object"""
-        assert pax_file.endswith(".pax.zip")
-        raise NotImplementedError()
-    '''
-
+    
     def as_xml_fragments(self) -> model_types.FileFragments:
+        """
+        Serialize object into XML fragments. See model_types.FileFragments for details
+        """
         builder = OpexXmlHelper.opex_builder
         ret = model_types.FileFragments(None, None, None)
 
@@ -183,7 +201,11 @@ class OpexFileContent:
         return ret
 
     @classmethod
-    def from_xml(cls, tree):
+    def from_xml(cls, tree: etree._Element):
+        """
+        Create and Instantiate object using a well formed opex xml file represented 
+        as an lxml etree
+        """
         ret = cls()
         filename = OpexXmlHelper.find(tree, "Transfer/OriginalFilename")
         ret.original_filename = getattr(filename, "text", None)
@@ -205,6 +227,14 @@ class OpexFileContent:
             
 @dataclass
 class OpexFolderContent:
+    """
+    Metadata associated with a folder and subfiles of given folder
+
+    Methods:
+    `as_xml_fragments(self)`: Serialize data into lxml elements
+    `from_fs`: Instantiate object from a filesystem fodler
+    `from_xml`
+    """
     original_filename: str
     security_descriptor: str
     subfolder_names: list[str]
