@@ -340,8 +340,8 @@ def get_subpaths(folder, as_relative=True):
                 file_paths.append(relpath)
                 continue
             file_paths.append(fullpath)
-        for folder in folder_paths:
-            fullpath = os.path.join(root, file)
+        for folder in folders:
+            fullpath = os.path.join(root, folder)
             if as_relative:
                 relpath = os.path.relpath(fullpath, basepath)
                 folder_paths.append(relpath)
