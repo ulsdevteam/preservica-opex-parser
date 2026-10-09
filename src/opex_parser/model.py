@@ -76,7 +76,7 @@ class OpexMetadataContent:
                     ret.descriptive_metadata = copy.deepcopy(self.descriptive_metadata)
                 case _:
                     continue
-        print(ret)
+        #print(ret)
         return ret
         
     def append_descriptive_metadata(self, subtree:etree._Element |
