@@ -327,19 +327,27 @@ class OpexFolderContent:
         #return cls(file_path, subfolder_names, subfile_names, subfile_sizes, subfile_types)
 
 
-def get_subfiles(folder, as_relative=True):
+def get_subpaths(folder, as_relative=True):
     basepath = folder
 
-    paths = []
-    for root, _, files in os.walk(folder):
+    file_paths = []
+    folder_paths = []
+    for root, folders, files in os.walk(folder):
         for file in files:
             fullpath = os.path.join(root, file)
             if as_relative:
                 relpath = os.path.relpath(fullpath, basepath)
-                paths.append(relpath)
+                file_paths.append(relpath)
                 continue
-            paths.append(fullpath)
-    return paths
+            file_paths.append(fullpath)
+        for folder in folder_paths:
+            fullpath = os.path.join(root, file)
+            if as_relative:
+                relpath = os.path.relpath(fullpath, basepath)
+                folder_paths.append(relpath)
+                continue
+            folder_paths.append(fullpath)
+    return file_paths, folder_paths
 
 
 @dataclass
@@ -360,15 +368,19 @@ class OpexPaxContent:
         subfiles = []
         fixities = []
 
-        _, folder_paths, _ = next(os.walk(pax_path))
-            
+        #_, folder_paths, _ = next(os.walk(pax_path))
+        
         assert os.path.isdir(pax_path)
+        '''
         for path in folder_paths:
             full_path = os.path.join(pax_path, path)
             assert os.path.exists(full_path)
             subfolder_names.append(path)
-
-        for file_path in get_subfiles(pax_path, as_relative=False): 
+        '''
+        file_paths, folder_paths = get_subpaths(pax_path, as_relative = False)
+        for folder_path in folder_paths:
+            subfolder_names.append(os.path.relpath(folder_path, pax_path))
+        for file_path in file_paths: 
             with open(file_path, "rb") as f:
                 content = f.read()
             for alg in algs:
